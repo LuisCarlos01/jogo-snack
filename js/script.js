@@ -6,7 +6,9 @@ const finalScore = document.querySelector(".final-score > span")
 const menu = document.querySelector(".menu-screen")
 const buttonPlay = document.querySelector(".btn-play")
 
-const audio = new Audio("../assets/audio.mp3")
+const audio = new Audio("./assets/audio.mp3")
+const audioEat = new Audio("./assets/eat.mp3")
+const audioGameOver = new Audio("./assets/gameover.mp3")
 
 const size = 30
 
@@ -14,8 +16,19 @@ const initialPosition = { x: 270, y: 240 }
 
 let snake = [initialPosition]
 
+const playAudio = (audioElement) => {
+    try {
+        audioElement.play().catch(error => {
+            console.log("Erro ao reproduzir áudio:", error)
+        })
+    } catch (error) {
+        console.log("Erro ao reproduzir áudio:", error)
+    }
+}
+
 const incrementScore = () => {
     score.innerText = +score.innerText + 10
+    playAudio(audioEat)
 }
 
 const randomNumber = (min, max) => {
@@ -43,6 +56,11 @@ const food = {
 
 let direction, loopId
 
+const normalSpeed = 300
+const boostSpeed = 100
+let currentSpeed = normalSpeed
+let isBoostActive = false
+
 const drawFood = () => {
     const { x, y, color } = food
 
@@ -51,6 +69,9 @@ const drawFood = () => {
     ctx.fillStyle = color
     ctx.fillRect(x, y, size, size)
     ctx.shadowBlur = 0
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
+    ctx.fillRect(x, y, size, size)
 }
 
 const drawSnake = () => {
@@ -58,7 +79,9 @@ const drawSnake = () => {
 
     snake.forEach((position, index) => {
         if (index == snake.length - 1) {
-            ctx.fillStyle = "white"
+            ctx.fillStyle = isBoostActive ? "#00ff00" : "white"
+        } else {
+            ctx.fillStyle = isBoostActive ? "#006600" : "#ddd"
         }
 
         ctx.fillRect(position.x, position.y, size, size)
@@ -112,7 +135,7 @@ const chackEat = () => {
     if (head.x == food.x && head.y == food.y) {
         incrementScore()
         snake.push(head)
-        audio.play()
+        playAudio(audio)
 
         let x = randomPosition()
         let y = randomPosition()
@@ -133,24 +156,25 @@ const checkCollision = () => {
     const canvasLimit = canvas.width - size
     const neckIndex = snake.length - 2
 
-    const wallCollision =
-        head.x < 0 || head.x > canvasLimit || head.y < 0 || head.y > canvasLimit
+    if (head.x < 0) {
+        snake[snake.length - 1] = { x: canvasLimit, y: head.y }
+    } else if (head.x > canvasLimit) {
+        snake[snake.length - 1] = { x: 0, y: head.y }
+    }
+
+    if (head.y < 0) {
+        snake[snake.length - 1] = { y: canvasLimit, x: head.x }
+    } else if (head.y > canvasLimit) {
+        snake[snake.length - 1] = { y: 0, x: head.x }
+    }
 
     const selfCollision = snake.find((position, index) => {
         return index < neckIndex && position.x == head.x && position.y == head.y
     })
 
-    if (wallCollision || selfCollision) {
+    if (selfCollision) {
         gameOver()
     }
-}
-
-const gameOver = () => {
-    direction = undefined
-
-    menu.style.display = "flex"
-    finalScore.innerText = score.innerText
-    canvas.style.filter = "blur(2px)"
 }
 
 const gameLoop = () => {
@@ -166,7 +190,7 @@ const gameLoop = () => {
 
     loopId = setTimeout(() => {
         gameLoop()
-    }, 300)
+    }, currentSpeed)
 }
 
 gameLoop()
@@ -174,18 +198,33 @@ gameLoop()
 document.addEventListener("keydown", ({ key }) => {
     if (key == "ArrowRight" && direction != "left") {
         direction = "right"
+        currentSpeed = boostSpeed
+        isBoostActive = true
     }
 
     if (key == "ArrowLeft" && direction != "right") {
         direction = "left"
+        currentSpeed = boostSpeed
+        isBoostActive = true
     }
 
     if (key == "ArrowDown" && direction != "up") {
         direction = "down"
+        currentSpeed = boostSpeed
+        isBoostActive = true
     }
 
     if (key == "ArrowUp" && direction != "down") {
         direction = "up"
+        currentSpeed = boostSpeed
+        isBoostActive = true
+    }
+})
+
+document.addEventListener("keyup", ({ key }) => {
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) {
+        currentSpeed = normalSpeed
+        isBoostActive = false
     }
 })
 
@@ -193,6 +232,19 @@ buttonPlay.addEventListener("click", () => {
     score.innerText = "00"
     menu.style.display = "none"
     canvas.style.filter = "none"
+    currentSpeed = normalSpeed
+    isBoostActive = false
 
     snake = [initialPosition]
 })
+
+const gameOver = () => {
+    direction = undefined
+    currentSpeed = normalSpeed
+    isBoostActive = false
+
+    playAudio(audioGameOver)
+    menu.style.display = "flex"
+    finalScore.innerText = score.innerText
+    canvas.style.filter = "blur(2px)"
+}
